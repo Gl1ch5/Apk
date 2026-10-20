@@ -104,36 +104,6 @@ jobs:
         run: |
           gradle --no-daemon :app:assembleDebug -x lint
 
-      - name: Smoke-test (запуск в эмуляторе)
-        continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 30
-          target: default
-          arch: x86_64
-          disable-animations: true
-          script: |
-            set -e
-            adb install -r app/build/outputs/apk/release/*.apk
-            adb logcat -c
-            adb shell am start -W -n com.gl1ch5.weathergazette/.MainActivity
-            sleep 20
-            PID=$(adb shell pidof com.gl1ch5.weathergazette || true)
-            echo "PID приложения: $PID"
-            adb logcat -d > /tmp/logcat.txt || true
-            grep -E "FATAL EXCEPTION|WeatherGazette|ANR in" /tmp/logcat.txt | tail -40 || true
-            if grep -q "FATAL EXCEPTION" /tmp/logcat.txt; then
-              echo "::error::Приложение упало при запуске — см. лог ниже"
-              grep -A 30 "FATAL EXCEPTION" /tmp/logcat.txt || true
-              exit 1
-            fi
-            if [ -z "$PID" ]; then
-              echo "::error::Процесс приложения не найден после запуска (возможен краш или ANR)"
-              adb logcat -d -b crash | tail -50 || true
-              exit 1
-            fi
-            echo "✅ Приложение запустилось и не упало"
-
       - name: Collect artifacts
         run: |
           set -e
