@@ -250,9 +250,12 @@
 
     // Шапка
     $('todayHuman').textContent = longDate(new Date());
-    const placeLine = [state.city.name, state.city.country, code.ru].filter(Boolean).join(' · ');
+    // Города не дублируем: «Москва · Россия» вместо «Москва · Москва · Россия»
+    let country = state.city.country || '';
+    if (country && country.toLowerCase() === state.city.name.toLowerCase()) country = '';
+    const placeLine = [state.city.name, country].filter(Boolean).join(' · ');
     $('weatherLine').textContent = placeLine;
-    $('weatherLine').title = placeLine;
+    $('weatherLine').title = placeLine + ' — ' + code.ru;
     updateLocationHint();
     $('cityLabel').textContent = state.city.name;
     $('sbCity').textContent = state.city.name;
