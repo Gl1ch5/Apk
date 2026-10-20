@@ -52,18 +52,50 @@ jobs:
           if [ -n "$KEYSTORE_B64" ]; then
             echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
             echo "KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> "$GITHUB_ENV"
             echo "signed=release" >> "$GITHUB_OUTPUT"
             echo "✅ Найден keystore из секретов — собираем подписанный релиз."
-          else
-            echo "signed=debug" >> "$GITHUB_OUTPUT"
-            echo "ℹ️ Секрет KEYSTORE_BASE64 не задан — APK будет подписан debug-ключом (устанавливается как обычно)."
+            exit 0
           fi
+          # Свой постоянный ключ в кэше: обновления ставятся поверх старой версии,
+          # а не требуют удаления приложения.
+          KS="$RUNNER_TEMP/gazette.keystore"
+          restore=""
+          if [ "${{ github.event_name }}" != "pull_request" ] && [ -n "${{ secrets.GITHUB_TOKEN }}" ]; then
+            restore=$(curl -s -o "$KS" -w "%{http_code}" \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/caches?key=gazette-release-keystore-v1" || true)
+          fi
+          if [ ! -f "$KS" ] || ! keytool -list -keystore "$KS" -storepass gazette-pass >/dev/null 2>&1; then
+            rm -f "$KS"
+            keytool -genkeypair -v -keystore "$KS" -storetype JKS -storepass gazette-pass \
+              -keypass gazette-pass -alias gazette -keyalg RSA -keysize 2048 -validity 10950 \
+              -dname "CN=Weather Gazette, O=Gl1ch5, C=RU" >/dev/null 2>&1
+            echo "cs=$(base64 -w0 "$KS")" >> "$GITHUB_OUTPUT"
+            echo "🔑 Сгенерирован новый постоянный ключ подписи (кэшируется)."
+          else
+            echo "🔑 Используем закэшированный ключ подписи."
+          fi
+          echo "KEYSTORE_PATH=$KS" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=gazette-pass" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=gazette" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=gazette-pass" >> "$GITHUB_ENV"
+          echo "signed=release" >> "$GITHUB_OUTPUT"
+
+      - name: Cache signing key
+        if: steps.signing.outputs.cs != ''
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/gazette.keystore
+          key: gazette-release-keystore-v1
 
       - name: Build release APK
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ env.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ env.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
         run: |
           gradle --no-daemon :app:assembleRelease -x lint
 
