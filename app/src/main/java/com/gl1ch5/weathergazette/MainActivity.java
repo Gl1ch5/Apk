@@ -70,9 +70,21 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        try {
+            WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        } catch (Throwable ignored) { }
         // Не гасим экран, пока читают сводку
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        try {
+            // Отдельный процесс для WebView не нужен, но рендер лучше включать явно
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                String process = getApplicationInfo().processName;
+                if (process != null && process.contains(":webview")) {
+                    WebView.setDataDirectorySuffix("webview");
+                }
+            }
+        } catch (Throwable ignored) { }
 
         root = new FrameLayout(this);
         root.setBackgroundColor(0xFFF3EAD6);
@@ -84,8 +96,8 @@ public class MainActivity extends AppCompatActivity {
         setContentView(root);
 
         // Контейнер с «печатным» фоном вокруг WebView, чтобы не было белых полос в тёмной теме
-        applySystemBarColors(0xFFF3EAD6, false);
-        setupInsets();
+        try { applySystemBarColors(0xFFF3EAD6, false); } catch (Throwable ignored) { }
+        try { setupInsets(); } catch (Throwable t) { android.util.Log.w("WeatherGazette", "insets", t); }
         setupWebView();
         setupNetworkWatcher();
 
@@ -172,14 +184,19 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin,
                                                            GeolocationPermissions.Callback callback) {
-                if (hasLocationPermission()) {
-                    callback.invoke(origin, true, false);
-                } else {
-                    pendingGeoCallback = callback;
-                    pendingGeoOrigin = origin;
-                    ActivityCompat.requestPermissions(MainActivity.this,
-                            new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,
-                                    Manifest.permission.ACCESS_FINE_LOCATION}, REQ_GEO);
+                try {
+                    if (hasLocationPermission()) {
+                        callback.invoke(origin, true, false);
+                    } else {
+                        pendingGeoCallback = callback;
+                        pendingGeoOrigin = origin;
+                        ActivityCompat.requestPermissions(MainActivity.this,
+                                new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,
+                                        Manifest.permission.ACCESS_FINE_LOCATION}, REQ_GEO);
+                    }
+                } catch (Throwable t) {
+                    android.util.Log.w("WeatherGazette", "geolocation prompt", t);
+                    callback.invoke(origin, false, false);
                 }
             }
 
@@ -444,18 +461,25 @@ public class MainActivity extends AppCompatActivity {
     /* ------------------------------------------------------------- UI */
 
     private void showLoading(boolean on) {
-        if (bar == null) {
-            bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-            bar.setMax(100);
-            bar.getProgressDrawable().setTint(0xFF93321D);
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(2));
-            lp.gravity = Gravity.TOP;
-            lp.topMargin = baseInsetTop;
-            root.addView(bar, lp);
+        try {
+            if (bar == null) {
+                bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+                bar.setMax(100);
+                android.graphics.drawable.Drawable pd = bar.getProgressDrawable();
+                if (pd != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    pd.setTint(0xFF93321D);
+                }
+                FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dp(2));
+                lp.gravity = Gravity.TOP;
+                lp.topMargin = baseInsetTop;
+                root.addView(bar, lp);
+            }
+            bar.setVisibility(on ? View.VISIBLE : View.GONE);
+            if (!on) bar.setProgress(0);
+        } catch (Throwable t) {
+            android.util.Log.w("WeatherGazette", "progress bar", t);
         }
-        bar.setVisibility(on ? View.VISIBLE : View.GONE);
-        if (!on) bar.setProgress(0);
     }
 
     private int dp(int v) {
