@@ -34,9 +34,25 @@ jobs:
           sed -i 's|<link rel="manifest"[^>]*>||' _site/index.html
           ls -la _site
 
-      - uses: actions/configure-pages@v5
+      # Пытаемся включить Pages программно (если у токена есть права)
+      - name: Enable Pages
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/pages" \
+            -f "build_type=workflow" -f "source[branch]=${{ github.ref_name }}" -f "source[path]=/" \
+            >/dev/null 2>&1 || gh api -X PUT "repos/${{ github.repository }}/pages" \
+            -f "build_type=workflow" >/dev/null 2>&1 || \
+            echo "::warning::Pages не включён. Включите: Settings → Pages → Source: GitHub Actions"
+
+      - id: pages
+        continue-on-error: true
+        uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
+        if: steps.pages.outcome == 'success'
         with:
           path: _site
       - id: deployment
+        if: steps.pages.outcome == 'success'
         uses: actions/deploy-pages@v4
