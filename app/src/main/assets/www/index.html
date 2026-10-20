@@ -16,8 +16,9 @@
 <header class="masthead" id="masthead">
   <div class="masthead__meta">
     <span id="todayHuman">—</span>
-    <button class="plain-btn" id="btnLocate" type="button" title="Моё местоположение" aria-label="Моё местоположение">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0-6v3m0 14v3M2 12h3m14 0h3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+    <button class="geo-btn" id="btnLocate" type="button" title="Определить местоположение" aria-label="Определить местоположение">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0-6v3m0 14v3M2 12h3m14 0h3" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="7.2" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+      <span>Рядом</span>
     </button>
   </div>
 
@@ -29,9 +30,9 @@
 
   <div class="masthead__issue">
     <span class="edition" id="editionNo">ВЫПУСК № 1</span>
-    <span class="price">Цена: <b>бесплатно</b></span>
-    <span class="weather-line" id="weatherLine">Погода · Всемирный обзор</span>
+    <span class="price">Бесплатно</span>
   </div>
+  <div class="masthead__line" id="weatherLine">Погода · всемирный обзор</div>
 
   <div class="masthead__rule thin"></div>
 
@@ -76,6 +77,12 @@
     <span id="updatedAt">Получаем свежий номер…</span>
     <button class="plain-btn linklike" id="btnForceRefresh" type="button">обновить</button>
   </div>
+
+  <button class="locate-banner" id="locateBanner" type="button" hidden>
+    <span class="locate-banner__icon" aria-hidden="true">◎</span>
+    <span class="locate-banner__txt"><b>Читать газету рядом с вами?</b><span>Разрешите геолокацию — подберём выпуск вашего города</span></span>
+    <span class="locate-banner__go" aria-hidden="true">→</span>
+  </button>
 
   <div id="content" aria-live="polite">
     <!-- Скелетон -->

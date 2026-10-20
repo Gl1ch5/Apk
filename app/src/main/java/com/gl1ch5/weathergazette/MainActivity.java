@@ -17,6 +17,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -252,8 +253,25 @@ public class MainActivity extends AppCompatActivity {
                 pendingGeoCallback = null;
                 pendingGeoOrigin = null;
             }
-            if (!granted) {
+            if (granted) {
+                ui.post(this::requestNativeLocation);
+            } else {
+                // Пользователь отказал — предлагаем открыть настройки приложения
                 js("window.onNativeLocation && window.onNativeLocation(null, null, 'Разрешение на геолокацию не выдано');");
+                if (geoRequestedByUser && !isFinishing()) {
+                    new androidx.appcompat.app.AlertDialog.Builder(this)
+                            .setTitle("Без геолокации")
+                            .setMessage("Можно включить доступ вручную: Настройки → Приложения → «Газета погоды» → Разрешения → Местоположение.\n\nЛибо выберите город поиском.")
+                            .setPositiveButton("Открыть настройки", (d, w) -> {
+                                try {
+                                    Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                            Uri.parse("package:" + getPackageName()));
+                                    startActivity(i);
+                                } catch (Exception ignored) { }
+                            })
+                            .setNegativeButton("Выбрать город", (d, w) -> js("document.getElementById('btnSearch') && document.getElementById('btnSearch').click();"))
+                            .show();
+                }
             }
         }
     }
@@ -342,19 +360,72 @@ public class MainActivity extends AppCompatActivity {
 
     /* ------------------------------------------------------- геолокация */
 
+    /** true, когда пользователь сам нажал «Рядом» — тогда показываем диалоги и объяснения */
+    private boolean geoRequestedByUser = false;
+
     private void requestNativeLocation() {
+        geoRequestedByUser = true;
+
         if (!hasLocationPermission()) {
+            // Системный диалог разрешения — показываем его всегда при первом запросе
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                    && shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)
+                    && !geoRationaleShown) {
+                geoRationaleShown = true;
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("Газета погоды")
+                        .setMessage("Чтобы напечатать выпуск для вашего города, нужно разрешить доступ к местоположению.\n\nДанные никуда не отправляются — координаты используются только для запроса прогноза.")
+                        .setPositiveButton("Разрешить", (d, w) -> ActivityCompat.requestPermissions(MainActivity.this,
+                                new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION}, REQ_GEO))
+                        .setNegativeButton("Не сейчас", (d, w) ->
+                                js("window.onNativeLocation && window.onNativeLocation(null,null,'Разрешение на геолокацию не выдано');"))
+                        .show();
+                return;
+            }
             ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,
-                            Manifest.permission.ACCESS_FINE_LOCATION}, REQ_GEO);
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION}, REQ_GEO);
             return;
         }
+
+        if (!isLocationEnabled()) {
+           // Геолокация выключена в системе — предлагаем включить
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Геолокация выключена")
+                    .setMessage("Включите «Местоположение» в настройках телефона, чтобы определить ваш город.")
+                    .setPositiveButton("Настройки", (d, w) -> {
+                        try {
+                            startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+                        } catch (Exception ignored) { }
+                    })
+                    .setNegativeButton("Отмена", null)
+                    .show();
+            js("window.onNativeLocation && window.onNativeLocation(null,null,'Геолокация выключена в настройках телефона');");
+            return;
+        }
+
         Location best = getBestLocation();
         if (best == null) {
-            js("window.onNativeLocation && window.onNativeLocation(null, null, 'Не удалось определить местоположение. Включите геолокацию.');");
+            js("window.onNativeLocation && window.onNativeLocation(null, null, 'Не удалось определить местоположение. Включите GPS и попробуйте снова.');");
             return;
         }
         js("window.onNativeLocation && window.onNativeLocation(" + best.getLatitude() + "," + best.getLongitude() + ", null);");
+    }
+
+    private boolean geoRationaleShown = false;
+
+    private boolean isLocationEnabled() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                return lm != null && lm.isLocationEnabled();
+            }
+            String mode = Settings.Secure.getString(getContentResolver(), Settings.Secure.LOCATION_MODE);
+            return mode != null && !"0".equals(mode);
+        } catch (Exception e) {
+            return true; // не мешаем попытке получить координаты
+        }
     }
 
     @Nullable

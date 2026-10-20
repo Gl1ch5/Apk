@@ -63,6 +63,17 @@
   const DAYS = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
   const DAYS_SHORT = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
   const DIRS = ['С','ССВ','СВ','ВСВ','В','ВЮВ','ЮВ','ЮЮВ','Ю','ЮЮЗ','ЮЗ','ЗЮЗ','З','ЗСЗ','СЗ','ССЗ'];
+  // Полные прилагательные в родительном падеже: «ветер северо-восточный»
+  const DIRS_FULL = [
+    'северный', 'северо-северо-восточный', 'северо-восточный', 'восточно-северо-восточный',
+    'восточный', 'восточно-юго-восточный', 'юго-восточный', 'юго-юго-восточный',
+    'южный', 'юго-юго-западный', 'юго-западный', 'западно-юго-западный',
+    'западный', 'западно-северо-западный', 'северо-западный', 'северо-северо-западный'
+  ];
+  const DIRS_SHORT_RU = ['С', 'ССВ', 'СВ', 'ВСВ', 'В', 'ВЮВ', 'ЮВ', 'ЮЮВ', 'Ю', 'ЮЮЗ', 'ЮЗ', 'ЗЮЗ', 'З', 'ЗСЗ', 'СЗ', 'ССЗ'];
+  const dirIndex = (deg) => (deg == null || isNaN(deg)) ? -1 : Math.round(deg / 22.5) % 16;
+  const dirLong = (deg) => { const i = dirIndex(deg); return i < 0 ? '—' : DIRS_FULL[i]; };
+  const dirShort = (deg) => { const i = dirIndex(deg); return i < 0 ? '—' : DIRS_SHORT_RU[i]; };
 
   const $ = (id) => document.getElementById(id);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -239,7 +250,10 @@
 
     // Шапка
     $('todayHuman').textContent = longDate(new Date());
-    $('weatherLine').textContent = state.city.name + ' · ' + code.ru;
+    const placeLine = [state.city.name, state.city.country, code.ru].filter(Boolean).join(' · ');
+    $('weatherLine').textContent = placeLine;
+    $('weatherLine').title = placeLine;
+    updateLocationHint();
     $('cityLabel').textContent = state.city.name;
     $('sbCity').textContent = state.city.name;
     $('sbNow').textContent = fmtT(c.temperature_2m);
@@ -271,6 +285,18 @@
     requestAnimationFrame(() => {
       $$('.lead[data-typed]', content).forEach((el) => { el.removeAttribute('data-typed'); });
     });
+  }
+
+  /** Текущий час в часовом поясе города (по смещению utc_offset_seconds) */
+  function timeInCity(d) {
+    try {
+      if (d && d.current && d.current.time) return Number(d.current.time.slice(11, 13));
+      if (d && typeof d.utc_offset_seconds === 'number') {
+        const shifted = new Date(Date.now() + d.utc_offset_seconds * 1000);
+        return shifted.getUTCHours();
+      }
+    } catch (_) {}
+    return null;
   }
 
   function longDate(dt) {
@@ -381,12 +407,19 @@
     const code = wmo(c.weather_code);
     const temp = round(convT(c.temperature_2m));
     const wind = beaufort(c.wind_speed_10m);
-    const windDir = dirName(c.wind_direction_10m);
+    const windDir = dirLong(c.wind_direction_10m);
     const pop = today.pop != null ? round(today.pop) : null;
     const rain = today.precip != null ? one(today.precip) : 0;
 
     const parts = [];
-    const dayWord = isDay ? (c.is_day === 1 ? 'днём' : 'сейчас') : 'сейчас';
+    const hour = timeInCity(d);
+    let dayWord;
+    if (hour == null) dayWord = 'сейчас';
+    else if (!isDay) dayWord = hour >= 21 || hour < 4 ? 'ночью' : 'вечером';
+    else if (hour < 6) dayWord = 'под утро';
+    else if (hour < 12) dayWord = 'утром';
+    else if (hour < 18) dayWord = 'днём';
+    else dayWord = 'вечером';
 
     let op = 'В ' + state.city.name + ' ' + dayWord + ' ' + (temp != null ? (temp > 0 ? '+' : '') + temp + '°' : '—') + ', ' + code.ru.toLowerCase() + '.';
     parts.push(op);
@@ -402,7 +435,7 @@
     }
 
     if (c.wind_speed_10m != null) {
-      parts.push('Ветер ' + windDir + 'овый, ' + fmtWind(c.wind_speed_10m) + (c.wind_gusts_10m >= 10 ? ', порывы до ' + fmtWind(c.wind_gusts_10m) : '') + ' (' + wind.name + ' ветер).');
+      parts.push('Ветер ' + windDir + ', ' + fmtWind(c.wind_speed_10m) + (c.wind_gusts_10m >= 10 ? ', порывы до ' + fmtWind(c.wind_gusts_10m) : '') + ' — ' + wind.name + '.');
     }
 
     // завтра
@@ -415,11 +448,14 @@
       parts.push('Завтра ожидается ' + tc.ru.toLowerCase() + ' и до ' + fmtT(tomorrow.max) + '. ' + trend + '.');
     }
 
-    // выходные
+    // ближайшие выходные (только сб/вс в пределах прогноза)
     const w = days.filter((x) => x.dow === 0 || x.dow === 6);
-    if (w.length) {
-      const tmax = w.reduce((a, b) => (b.max > a.max ? b : a), w[0]);
-      parts.push('На выходных самая тёплая погода ожидается в ' + DAYS[w.indexOf(tmax)].toLowerCase() + ': до ' + fmtT(tmax.max) + '.');
+    if (w.length === 1) {
+      parts.push('Ближайший выходной — ' + DAYS[w[0].dow] + ', до ' + fmtT(w[0].max) + ', ' + wmo(w[0].code).ru.toLowerCase() + '.');
+    } else if (w.length >= 2) {
+      const tmax = w.reduce((a, b) => ((b.max ?? -999) > (a.max ?? -999) ? b : a), w[0]);
+      const warmDay = tmax.dow === 6 ? 'в субботу' : 'в воскресенье';
+      parts.push('На выходных теплее всего ' + warmDay + ': до ' + fmtT(tmax.max) + '.');
     }
 
     parts.push('Влажность воздуха — ' + round(c.relative_humidity_2m) + '%, давление — ' + fmtPress(c.pressure_msl) + '.');
@@ -500,9 +536,9 @@
       '<div class="headline__place">', esc(state.city.name), '</div>',
       '<div class="headline__deck">', esc(deck), '</div>',
       '<div class="headline__row">',
-      '<div>',
+      '<div class="headline__main">',
       '<div class="headline__temp">', esc(String(round(convT(c.temperature_2m)))), '<sup>°', state.unit === 'F' ? 'F' : 'C', '</sup></div>',
-      '<div class="headline__feel">Ощущается как <b>', esc(fmtT(c.apparent_temperature)), '</b>', feels != null && round(convT(c.temperature_2m)) != null && Math.abs(feels - round(convT(c.temperature_2m))) >= 1 ? ' · ' + (feels < round(convT(c.temperature_2m)) ? 'ветер холодит' : 'теплее на ' + Math.abs(feels - round(convT(c.temperature_2m))) + '°') : '', '</div>',
+      '<div class="headline__feel">Ощущается как <b>', esc(fmtT(c.apparent_temperature)), '</b>', feels != null && round(convT(c.temperature_2m)) != null && Math.abs(feels - round(convT(c.temperature_2m))) >= 1 ? '<br>' + (feels < round(convT(c.temperature_2m)) ? 'ветер холодит' : 'теплее на ' + Math.abs(feels - round(convT(c.temperature_2m))) + '°') : '', '</div>',
       '</div>',
       '<div class="headline__fig"><div class="glyph">', glyph, '</div><div class="cond">', esc(code.ru), '</div></div>',
       '</div>',
@@ -698,6 +734,22 @@
     }
   }
 
+  /** Баннер «определить местоположение», если ещё не определили */
+  function updateLocationHint() {
+    const banner = $('locateBanner');
+    if (!banner) return;
+    const done = !!store.get('gp.geoDone.v1', false);
+    banner.hidden = done || state.cityIsGeo === true;
+  }
+
+  function setGeoBusy(on) {
+    state.geoPending = on;
+    const b = $('btnLocate');
+    if (b) b.classList.toggle('is-busy', on);
+    const row = $('btnGeoRow');
+    if (row) row.disabled = on;
+  }
+
   function cycleTheme() {
     const order = ['print', 'evening', 'night'];
     const cur = document.documentElement.dataset.theme || 'print';
@@ -747,30 +799,55 @@
   /* --------------------------------------------------------- геолокация */
 
   function locate() {
-    if (state.geoPending) return;
+    if (state.geoPending) { toast('Уже определяем местоположение…'); return; }
+    closeSearch();
+
+    // Нативно — предпочтительно: виден системный диалог разрешения
     if (isNative() && native().requestLocation) {
-      state.geoPending = true;
-      closeSearch();
-      toast('Определяем местоположение…');
-      try { native().requestLocation(); } catch (_) { state.geoPending = false; toast('Геолокация недоступна'); }
+      setGeoBusy(true);
+      toast('Запрашиваем разрешение на геолокацию…', 2600);
+      try {
+        native().requestLocation();
+        // страховка, если ответ от нативного слоя не придёт
+        setTimeout(() => {
+          if (state.geoPending) {
+            setGeoBusy(false);
+            toast('Геолокация не ответила. Проверьте, что она включена в настройках телефона.', 3200);
+          }
+        }, 25000);
+      } catch (_) {
+        setGeoBusy(false);
+        toast('Геолокация недоступна на этом устройстве');
+      }
       return;
     }
+
     if (!navigator.geolocation) { toast('Геолокация не поддерживается'); return; }
-    state.geoPending = true;
-    closeSearch();
-    toast('Определяем местоположение…');
+    setGeoBusy(true);
+    toast('Определяем местоположение…', 2600);
     navigator.geolocation.getCurrentPosition(
       (pos) => onGeo(pos.coords.latitude, pos.coords.longitude),
-      (err) => { state.geoPending = false; toast(err && err.code === 1 ? 'Доступ к геолокации запрещён в настройках' : 'Не удалось определить местоположение'); },
-      { enableHighAccuracy: false, timeout: 12000, maximumAge: 10 * 60 * 1000 }
+      (err) => {
+        setGeoBusy(false);
+        toast(err && err.code === 1
+          ? 'Доступ к геолокации запрещён. Включите его в настройках приложения.'
+          : 'Не удалось определить местоположение. Включите GPS и попробуйте снова.', 3200);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5 * 60 * 1000 }
     );
   }
 
   // Вызывается из нативного слоя
   window.onNativeLocation = function (lat, lon, error) {
-    state.geoPending = false;
+    setGeoBusy(false);
     if (error || lat == null || lon == null) {
-      toast(typeof error === 'string' && error ? error : 'Не удалось определить местоположение');
+      const msg = typeof error === 'string' && error ? error : 'Не удалось определить местоположение';
+      // Если разрешение не дали — подробно и понятно, куда идти
+      if (msg.indexOf('Разрешение') >= 0 || msg.indexOf('разрешени') >= 0) {
+        toast('Геолокация запрещена. Включите её: Настройки → Приложения → Газета погоды → Разрешения → Местоположение', 6000);
+      } else {
+        toast(msg, 3200);
+      }
       return;
     }
     onGeo(Number(lat), Number(lon));
@@ -807,9 +884,12 @@
 
   function setCity(city, fromGeo) {
     state.city = city;
+    state.cityIsGeo = !!fromGeo;
+    if (fromGeo) store.set('gp.geoDone.v1', true);
     store.set(LS.city, city);
     $('cityLabel').textContent = city.name;
     closeSearch();
+    updateLocationHint();
     loadWeather();
     if (fromGeo) toast('Выпуск для ' + city.name);
   }
@@ -922,6 +1002,7 @@
     $('btnSearch').addEventListener('click', openSearch);
     $('btnLocate').addEventListener('click', locate);
     $('btnGeoRow').addEventListener('click', locate);
+    $('locateBanner').addEventListener('click', locate);
     $('btnUnits').addEventListener('click', toggleUnits);
     $('btnTheme').addEventListener('click', cycleTheme);
     $('btnRefresh').addEventListener('click', () => loadWeather());
