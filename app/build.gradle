@@ -1,0 +1,76 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.gl1ch5.weathergazette'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.gl1ch5.weathergazette"
+        minSdk 23
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+        resValue "string", "app_name", "Газета погоды"
+        vectorDrawables.useSupportLibrary = true
+    }
+
+    signingConfigs {
+        // Подпись для релизных сборок. Если keystore не передан — собираем debug-подписью.
+        release {
+            def storePath = System.getenv("KEYSTORE_PATH")
+            if (storePath != null && !storePath.isEmpty() && file(storePath).exists()) {
+                storeFile file(storePath)
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            debuggable false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (System.getenv("KEYSTORE_PATH") != null && !System.getenv("KEYSTORE_PATH").isEmpty()) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/*.kotlin_module', 'META-INF/DEPENDENCIES']
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.core:core:1.12.0'
+    implementation 'androidx.webkit:webkit:1.9.0'
+}

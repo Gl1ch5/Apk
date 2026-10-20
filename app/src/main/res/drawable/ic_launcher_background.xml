@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Бумажный фон иконки с лёгкой «печатной» сеткой -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0 L108,0 L108,108 L0,108 Z" android:fillColor="#F3EAD6" />
+    <path android:pathData="M0,26 L108,26 M0,52 L108,52 M0,78 L108,78"
+        android:strokeColor="#E2D4B5" android:strokeWidth="0.7" android:strokeAlpha="0.55" />
+</vector>

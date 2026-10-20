@@ -1,0 +1,17 @@
+# Gradle
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+captures/
+.cxx/
+
+# Keystore — никогда в репозиторий
+*.jks
+*.keystore
+
+# OS
+.DS_Store
+Thumbs.db

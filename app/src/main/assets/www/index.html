@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ru" data-theme="print">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f3ead6">
+<meta name="format-detection" content="telephone=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' gap: data: blob:; connect-src https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api.bigdatacloud.net; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:;">
+<title>ГАЗЕТА ПОГОДЫ</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- Шапка издания -->
+<header class="masthead" id="masthead">
+  <div class="masthead__meta">
+    <span id="todayHuman">—</span>
+    <button class="plain-btn" id="btnLocate" type="button" title="Моё местоположение" aria-label="Моё местоположение">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0-6v3m0 14v3M2 12h3m14 0h3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+    </button>
+  </div>
+
+  <div class="masthead__title-wrap">
+    <h1 class="masthead__title">Газета&nbsp;погоды</h1>
+  </div>
+
+  <div class="masthead__rule"><div class="ornament">❦</div></div>
+
+  <div class="masthead__issue">
+    <span class="edition" id="editionNo">ВЫПУСК № 1</span>
+    <span class="price">Цена: <b>бесплатно</b></span>
+    <span class="weather-line" id="weatherLine">Погода · Всемирный обзор</span>
+  </div>
+
+  <div class="masthead__rule thin"></div>
+
+  <div class="toolbar">
+    <button class="chip" id="btnSearch" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8"/></svg>
+      <span id="cityLabel">Москва</span>
+    </button>
+    <div class="toolbar__right">
+      <button class="chip small" id="btnUnits" type="button" title="Переключить единицы">°C</button>
+      <button class="chip small" id="btnTheme" type="button" title="Сменить оформление" aria-label="Сменить оформление">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18 4.5 4.5 0 0 1 0-9 4.5 4.5 0 0 0 0-9Z" fill="currentColor"/></svg>
+      </button>
+      <button class="chip small" id="btnRefresh" type="button" title="Обновить" aria-label="Обновить">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4h-4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <nav class="tabs" id="tabs" aria-label="Разделы">
+    <button class="tab is-active" data-tab="headline" type="button">Передовица</button>
+    <button class="tab" data-tab="hourly" type="button">По часам</button>
+    <button class="tab" data-tab="week" type="button">Неделя</button>
+    <button class="tab" data-tab="details" type="button">Сводка</button>
+  </nav>
+</header>
+
+<!-- Липкая строка состояния: видна при прокрутке -->
+<div class="statusbar" id="statusbar" aria-hidden="true">
+  <span id="sbCity">Москва</span>
+  <span id="sbNow">—</span>
+  <span id="sbTemps">—</span>
+</div>
+
+<main id="main">
+  <!-- Линейка прогресса обновления -->
+  <div class="progress" id="progress" hidden><div class="progress__bar"></div></div>
+
+  <!-- Свежий номер (статус) -->
+  <div class="dateline" id="dateline">
+    <span class="dateline__dot" id="liveDot"></span>
+    <span id="updatedAt">Получаем свежий номер…</span>
+    <button class="plain-btn linklike" id="btnForceRefresh" type="button">обновить</button>
+  </div>
+
+  <div id="content" aria-live="polite">
+    <!-- Скелетон -->
+    <section class="skeleton" id="skeleton">
+      <div class="sk-sk"></div>
+      <div class="sk-headline"></div>
+      <div class="sk-headline short"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line short"></div>
+      <div class="sk-cards"><div></div><div></div><div></div></div>
+    </section>
+  </div>
+
+  <!-- Ошибка / офлайн -->
+  <section class="error-sheet" id="errorSheet" hidden>
+    <div class="error-sheet__inner">
+      <div class="error-sheet__icon" aria-hidden="true">☂</div>
+      <h2 class="error-sheet__title" id="errTitle">Выпуск задержан</h2>
+      <p class="error-sheet__text" id="errText">Не удалось получить сводку. Проверьте соединение.</p>
+      <button class="btn-primary" id="btnRetry" type="button">Получить номер ещё раз</button>
+      <button class="btn-ghost" id="btnOfflineArchive" type="button" hidden>Открыть прошлый выпуск</button>
+    </div>
+  </section>
+
+  <footer class="colophon">
+    <div class="colophon__rule"></div>
+    <p><b>ГАЗЕТА ПОГОДЫ</b> · ежедневное издание о состоянии неба. Данные: Open-Meteo (CC BY 4.0) и геокодер Open-Meteo.</p>
+    <p class="colophon__small">Прогноз — вероятностная оценка, а не приговор. Редакция не несёт ответственности за испорченный пикник.</p>
+  </footer>
+</main>
+
+<!-- Панель поиска -->
+<div class="sheet" id="searchSheet" hidden>
+  <div class="sheet__backdrop" data-close></div>
+  <div class="sheet__panel" role="dialog" aria-modal="true" aria-labelledby="searchTitle">
+    <div class="sheet__grab" data-close></div>
+    <div class="sheet__head">
+      <h2 id="searchTitle">Найти город</h2>
+      <button class="plain-btn" data-close type="button" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="search-field">
+      <input id="searchInput" type="search" inputmode="search" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Москва, Лондон, Токио…" aria-label="Город">
+      <button class="plain-btn" id="searchClear" type="button" aria-label="Очистить" hidden>✕</button>
+    </div>
+    <div class="sheet__section" id="searchHint">
+      <div class="kicker">Редакционный выбор</div>
+      <div class="quick-cities" id="quickCities"></div>
+      <button class="geo-row" id="btnGeoRow" type="button">
+        <span class="geo-row__icon" aria-hidden="true">◎</span>
+        <span>Газета у меня: определить местоположение</span>
+      </button>
+    </div>
+    <div class="sheet__section" id="searchResults" hidden></div>
+    <div class="sheet__section" id="searchEmpty" hidden>
+      <p class="muted" id="searchEmptyText">Ничего не найдено. Попробуйте другое название.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Тосты -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Первый запуск: заставка -->
+<div class="splash" id="splash">
+  <div class="splash__paper">
+    <div class="splash__top">Ежедневное издание</div>
+    <div class="splash__title">ГАЗЕТА<br>ПОГОДЫ</div>
+    <div class="splash__orn">❦</div>
+    <div class="splash__sub">Свежий воздух в свежей прессе</div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
