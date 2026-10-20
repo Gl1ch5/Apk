@@ -249,13 +249,12 @@
     const isDay = c.is_day === 1 || isDaylight(sunrise, sunset);
 
     // Шапка
-    $('todayHuman').textContent = longDate(new Date());
-    // Города не дублируем: «Москва · Россия» вместо «Москва · Москва · Россия»
-    let country = state.city.country || '';
-    if (country && country.toLowerCase() === state.city.name.toLowerCase()) country = '';
-    const placeLine = [state.city.name, country].filter(Boolean).join(' · ');
-    $('weatherLine').textContent = placeLine;
-    $('weatherLine').title = placeLine + ' — ' + code.ru;
+    $('todayHuman').textContent = shortDate(new Date());
+    // В строке — только город: страна уезжает в подсказку, чтобы не обрезать название
+    const country = (state.city.country && state.city.country.toLowerCase() !== state.city.name.toLowerCase())
+      ? state.city.country : '';
+    $('weatherLine').textContent = state.city.name;
+    $('weatherLine').title = [state.city.name, country, code.ru].filter(Boolean).join(' · ');
     updateLocationHint();
     $('cityLabel').textContent = state.city.name;
     $('sbCity').textContent = state.city.name;
@@ -263,7 +262,7 @@
     const t0 = round(convT(daily.temperature_2m_min && daily.temperature_2m_min[0]));
     const t1 = round(convT(daily.temperature_2m_max && daily.temperature_2m_max[0]));
     $('sbTemps').textContent = (t1 != null ? '+' + t1 + '°' : '—') + (t0 != null ? ' / ' + t0 + '°' : '');
-    $('editionNo').textContent = 'ВЫПУСК № ' + editionNumber();
+    $('editionNo').textContent = '№ ' + editionNumber();
     markStale(Date.now(), false);
 
     applyTheme(d, isDay);
@@ -300,6 +299,11 @@
       }
     } catch (_) {}
     return null;
+  }
+
+  /** Короткая дата для шапки: «вт, 20 октября» */
+  function shortDate(dt) {
+    return DAYS_SHORT[dt.getDay()].toLowerCase() + ', ' + dt.getDate() + ' ' + MONTHS[dt.getMonth()];
   }
 
   function longDate(dt) {
@@ -872,16 +876,66 @@
 
   let lastLoadAt = 0;
 
+  /**
+   * Приводим официальные мун. названия к человеческим:
+   * «Городской округ «город Иркутск»» → «Иркутск»
+   * «Муниципальный район «Туапсинский район»» → «Туапсе»/«Туапсинский район»
+   * «Городское поселение Мытищи» → «Мытищи»
+   */
+  function cleanPlaceName(raw) {
+    if (!raw) return '';
+    let s = String(raw).trim();
+
+    // Извлекаем содержимое кавычек: «...», "..." или '...'
+    const quoted = s.match(/[«"„']([^»"“']+)[»"“']/);
+    if (quoted && quoted[1].trim()) s = quoted[1].trim();
+
+    let prev;
+    do {
+      prev = s;
+      s = s
+        .replace(/^(городской|городского|сельского)\s+округ[аи]?\s*/i, '')
+        .replace(/^(муниципальный|муниципального)\s+(район|округ)[аи]?\s*/i, '')
+        .replace(/^(городское|сельское)\s+поселени[ея]\s*/i, '')
+        .replace(/^(город|пос[её]лок|село|станица|деревня|рабочий пос[её]лок|пгт)\.?\s+/i, '')
+        .replace(/^г\.\s*/i, '')
+        .replace(/^\s*(город|пос[её]лок)\s+/i, '')
+        .trim();
+    } while (s !== prev && s.length > 0);
+
+    // «Иркутск» в родительном/прилагательном — оставляем как есть
+    s = s.replace(/\s{2,}/g, ' ');
+    // Заглавная первая буква
+    if (s) s = s.charAt(0).toUpperCase() + s.slice(1);
+    return s;
+  }
+
   async function onGeo(lat, lon) {
     const city = { name: 'Моё место', country: '', lat, lon, tz: '' };
+    let clean = '';
+
     try {
-      // Обратное геокодирование: ближайший населённый пункт (BigDataCloud, без ключа)
+      // 1) Обратное геокодирование: ближайший населённый пункт (BigDataCloud, без ключа)
       const r = await fetchJSON('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + lat.toFixed(4) + '&longitude=' + lon.toFixed(4) + '&localityLanguage=ru', 7000);
-      const name = r.city || r.locality || r.principalSubdivision || '';
-      if (name) city.name = name;
+      clean = cleanPlaceName(r.city) || cleanPlaceName(r.locality) || '';
+      // locality — это район внутри города («Арбат»), берём его только если города нет
+      if (!clean) clean = cleanPlaceName(r.locality) || '';
       city.country = r.countryName || '';
-      city.admin = r.principalSubdivision || '';
-    } catch (_) { /* работаем по координатам */ }
+      city.admin = cleanPlaceName(r.principalSubdivision) || '';
+    } catch (_) { /* пробуем запасной вариант */ }
+
+    // 2) Запасной вариант и уточнение: ближайший город из геокодера Open-Meteo
+    if (!clean || /район|округ|поселение/i.test(clean)) {
+      try {
+        const near = await fetchJSON(
+          'https://geocoding-api.open-meteo.com/v1/search?name=&latitude=' + lat.toFixed(3) +
+          '&longitude=' + lon.toFixed(3) + '&count=1&language=ru&format=json', 6000);
+        const hit = near && near.results && near.results[0];
+        if (hit && hit.name) clean = hit.name;
+      } catch (_) { }
+    }
+
+    if (clean) city.name = clean;
     setCity(city, true);
   }
 

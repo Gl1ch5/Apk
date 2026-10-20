@@ -132,45 +132,39 @@ svg { width: 1.15em; height: 1.15em; display: block; }
 .locate-banner__go { margin-left: auto; color: var(--accent); font-weight: 900; flex: none; }
 .locate-banner:active { transform: translateY(1px); }
 
-.masthead__title-wrap { margin: 2px 0 4px; }
-
 .masthead__title {
-  margin: 0;
+  margin: 1px 0 3px;
   font-family: var(--display);
   font-weight: 900;
-  font-size: clamp(1.72rem, 9.6vw, 3.1rem);
-  line-height: .94;
-  letter-spacing: -.015em;
+  /* Одна строка, вписанная в ширину экрана: 9 знаков + пробел ≈ 0.62em на знак */
+  font-size: clamp(1.55rem, 8.7vw, 2.9rem);
+  line-height: .96;
+  letter-spacing: -.02em;
   text-transform: uppercase;
-  overflow-wrap: normal;
-  word-break: keep-all;
+  white-space: nowrap;
   color: var(--ink);
   text-shadow: 0 1px 0 rgba(255,255,255,.25);
-}
-
-.masthead__rule {
-  display: flex; align-items: center; justify-content: center; gap: 10px;
   border-top: 3px double var(--rule);
-  margin: 6px 0 0;
-  height: 0;
-}
-.masthead__rule.thin { border-top: 1px solid var(--rule); margin-top: 8px; }
-.ornament {
-  position: relative; top: -10px; background: var(--paper); padding: 0 10px;
-  font-size: .85rem; color: var(--accent); line-height: 1;
+  border-bottom: 1px solid var(--rule);
+  padding: 5px 0 4px;
 }
 
-.masthead__issue {
-  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-  font-size: .64rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2);
-  padding: 5px 2px 6px; font-weight: 700;
+.masthead__strip {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 4px 1px 3px;
 }
-.masthead__issue .price { white-space: nowrap; }
-
 .masthead__line {
-  font-size: .66rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 800;
-  color: var(--accent); padding: 0 2px 6px; line-height: 1.3;
-  white-space: normal; overflow-wrap: anywhere;
+  font-size: .64rem; text-transform: uppercase; letter-spacing: .09em; font-weight: 800;
+  color: var(--accent); line-height: 1.25; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.masthead__meta2 {
+  font-size: .6rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 700;
+  color: var(--ink-3); white-space: nowrap; flex: none;
+}
+
+.masthead__date {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .toolbar {
@@ -504,8 +498,7 @@ html[data-theme="night"] .btn-primary { background: var(--ink); color: var(--pap
 /* ============================ АДАПТИВ ============================ */
 @media (max-width: 340px) {
   body { font-size: 15px; }
-  .masthead__issue .price { display: none; }
-  .headline__fig { min-width: 74px; }
+    .headline__fig { min-width: 74px; }
   .headline__fig .glyph { font-size: 2.5rem; }
 }
 @media (min-width: 560px) {

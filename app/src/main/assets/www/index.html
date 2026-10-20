@@ -15,26 +15,19 @@
 <!-- Шапка издания -->
 <header class="masthead" id="masthead">
   <div class="masthead__meta">
-    <span id="todayHuman">—</span>
+    <span class="masthead__date" id="todayHuman">—</span>
     <button class="geo-btn" id="btnLocate" type="button" title="Определить местоположение" aria-label="Определить местоположение">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0-6v3m0 14v3M2 12h3m14 0h3" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="7.2" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
       <span>Рядом</span>
     </button>
   </div>
 
-  <div class="masthead__title-wrap">
-    <h1 class="masthead__title">Газета&nbsp;погоды</h1>
+  <h1 class="masthead__title">Газета погоды</h1>
+
+  <div class="masthead__strip">
+    <span class="masthead__line" id="weatherLine">Погода · всемирный обзор</span>
+    <span class="masthead__meta2"><span id="editionNo">№ 1</span> · <span class="price">бесплатно</span></span>
   </div>
-
-  <div class="masthead__rule"><div class="ornament">❦</div></div>
-
-  <div class="masthead__issue">
-    <span class="edition" id="editionNo">ВЫПУСК № 1</span>
-    <span class="price">Бесплатно</span>
-  </div>
-  <div class="masthead__line" id="weatherLine">Погода · всемирный обзор</div>
-
-  <div class="masthead__rule thin"></div>
 
   <div class="toolbar">
     <button class="chip" id="btnSearch" type="button">
